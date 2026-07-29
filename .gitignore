@@ -1,0 +1,25 @@
+# Dati: contengono nomi reali di lega/amici, non vanno pubblicati
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Output generati (dashboard html, csv di report)
+outputs/*
+!outputs/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+venv/
+.venv/
+*.egg-info/
+
+# Credenziali / config locali
+.env
+*.pem
+
+# Sistema
+.DS_Store
