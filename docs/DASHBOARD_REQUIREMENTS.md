@@ -27,14 +27,26 @@ xG90, xA90) non contengono clean sheet ne' altre metriche specifiche
 da portiere. Va verificato se Understat le espone in un export diverso
 o se serve una fonte dati aggiuntiva solo per i portieri.
 
-## 3. Quotazione "piu' reale" — merge con storico prezzi reali della lega
+## 3. Quotazione "piu' reale" — scostamento vs prezzo pagato in lega
 
-Serve un nuovo dataset: quanto hanno speso REALMENTE i tuoi amici per
-ogni giocatore nelle aste passate (probabilmente gia' presente nei
-file leagueplayers_XX_YY.csv originali, o da recuperare altrove — DA
-CHIARIRE quando ci arriviamo). Implica una nuova tabella tipo
-`prezzi_storici_lega` collegata a player_id, e un'aggregazione
-(media/scostamento) da mostrare vs QUOT. ufficiale.
+**AGGIORNAMENTO 31/07 — nessuna nuova fonte necessaria.** I dati ci
+sono gia': `fantagazzetta_listino.fantasquadra`/`costo`, popolati fin
+dalla migrazione iniziale (250 giocatori su 663 gia' assegnati nella
+tua lega, stagione 25/26). Confermato via query diretta — prezzi
+credibili (es. Yildiz pagato ~9x la QUOT. ufficiale, sorpresa esplosa
+a sorpresa; Krstovic preso da Real United, la squadra che vince la
+lega).
+
+**Ridimensionamento onesto**: l'idea originale era uno storico
+MULTI-stagione (per vedere se un giocatore viene pagato sistematicamente
+sopra/sotto QUOT. negli anni). Con un solo anno di dati reali disponibile
+(25/26), quello che possiamo costruire e' uno scostamento su singola
+stagione (`costo - quot`, o `costo/quot`), non un trend storico
+robusto. Utile comunque, ma va comunicato come tale, non spacciato per
+piu' di quello che e'.
+
+Non serve una tabella nuova: l'aggregazione si fa direttamente su
+`fantagazzetta_listino` esistente.
 
 ## 4. Cambi di ruolo
 
@@ -90,7 +102,7 @@ nostro) quando arriviamo alla UI.
 Idea di Andrea: per neo-acquisti da campionati esteri, recuperare lo
 storico da Understat (che copre anche Premier/Liga/Bundesliga/Ligue 1
 etc., non solo Serie A) e "pesare" il campionato di provenienza con un
-coefficiente di difficoltà, per stimare la produzione attesa in Serie A.
+coefficiente di difficolta', per stimare la produzione attesa in Serie A.
 Sotto-progetto a se': serve scegliere/validare un indice di forza
 campionati (esiste letteratura, da cercare quando ci arriviamo). Non
 un'estensione veloce di name_matching.py — richiede la sua analisi.
@@ -105,11 +117,12 @@ puo' avere piu' tag da fonti diverse, quindi non un singolo campo in
 
 ## 7. Budget suggerito — range in crediti e % sul budget (500 cr)
 
-Combina il punto 3 (prezzi storici reali) con QUOT./convenienza gia'
-calcolati, per suggerire un range di spesa per giocatore, sia in
-crediti assoluti sia come percentuale del budget totale di lega (500
-crediti). Dipende dal punto 3 per avere dati reali su cui basare il
-range, non solo QUOT. ufficiale.
+Combina il punto 3 (ora confermato: dati gia' disponibili, singola
+stagione) con QUOT./convenienza gia' calcolati, per suggerire un range
+di spesa per giocatore, sia in crediti assoluti sia come percentuale
+del budget totale di lega (500 crediti). Con un solo anno di dati reali
+il "range" sara' meno un range statistico e piu' un singolo scostamento
+osservato — da comunicare con la stessa cautela del punto 3.
 
 ## 8. Prezzo modificabile dopo "aggiungi" alla rosa
 
