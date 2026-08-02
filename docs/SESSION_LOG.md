@@ -168,3 +168,105 @@ docs/DASHBOARD_REQUIREMENTS.md), invece di procedere alla cieca.
 3. Test end-to-end con VCAF_Ep__3.xlsx (dati di prova, NON definitivi —
    il file vero arriva 1-3/09 a mercato chiuso)
 4. Poi: dashboard HTML, README, fase 2 backtest (invariato da sopra)
+
+
+---
+
+## 2026-08-02 — Integrazione FantaLab: tabelle, matching, primo carico completo
+
+**Fatto:**
+- Migrazione `sql/002_fantalab_tables.sql`: tabelle `fantalab_valutazioni`
+  (33 colonne, ispezionate dal file reale — 8 non erano nel backlog
+  originale: `Obiett.`, `Fascia`, `Ruolo`, `Team`, `Pt. Tit.`, `Pt. Inf.`,
+  `Ammonizioni`, `Espulsioni`) e `player_tags`. `match_method` esteso
+  con `'orphan_created'` per i player_id creati senza corrispondenza —
+  poi scoperto inutilizzato (vedi decisione lineage sotto), lasciato
+  comunque nel CHECK, innocuo.
+- Migrazione `sql/003_fantalab_multi_strategia.sql`: `UNIQUE` su
+  `fantalab_valutazioni` esteso da `(player_id, fonte, scaricato_il)` a
+  `(player_id, fonte, strategia, scaricato_il)` — il constraint
+  originale non reggeva due fantallenatori scaricati lo stesso giorno.
+- Migrazione `sql/004_fantalab_match_lineage.sql`: `match_method` e
+  `match_confidence` spostati dentro `fantalab_valutazioni` stessa,
+  invece di riusare `player_name_matches` (le cui colonne
+  `understat_name_raw`/`fantagazzetta_name_raw` sono nominate per
+  Understat specificamente — riusarla per FantaLab avrebbe scritto
+  nomi FantaLab in una colonna che dichiara di contenere nomi Understat).
+- `src/fantalab_matching.py`: carica le 4 sheet (P/D/C/A) di
+  `VCAF_Ep__3.xlsx`, matcha su `fantagazzetta_listino` (match esatto,
+  poi fallback fuzzy per-cognome), crea player_id orfani per i
+  non-match, popola `fantalab_valutazioni` + `player_tags` (da Nota
+  1-5). Flag `--sheets` per rilanciare sheet singole in caso di errore
+  a metà carico.
+
+**Decisioni chiave:**
+- `strategia` = `'CarmySpecial'`, `scaricato_il` = `'2026-07-31'` per
+  questo primo carico di test.
+- Fallback fuzzy per FantaLab **diverso** da `trova_corrispondenza` di
+  Understat: i nomi FantaLab sono gia' in formato Fantagazzetta
+  (cognome, o "Cognome I."), non nome-completo — non serve
+  `estrai_cognome_iniziale` ne' `MAPPATURA_MANUALE` (quella e'
+  Understat-specifica).
+- Player_id orfani: nessuna riga in `player_name_matches` per loro
+  (quella tabella resta Understat-only), il lineage FantaLab vive
+  interamente in `fantalab_valutazioni.match_method`.
+
+**Bug trovato e corretto:**
+- Il primo fallback fuzzy staccava l'iniziale finale del nome FantaLab
+  prima di cercare match per cognome (`"El Azzouzi A."` -> cerca
+  `"El Azzouzi"`). Su un listino con **un solo** omonimo per cognome,
+  questo faceva collassare due giocatori diversi sullo stesso player_id
+  quando FantaLab li disambiguava con l'iniziale proprio perche' erano
+  omonimi: **Anouar El Azzouzi** (Frosinone) e **Oussama El Azzouzi**
+  (Bologna) sullo stesso player_id; poi lo stesso pattern su
+  **Robinho Vaz** (attaccante, Roma) vs **Marcelo Vaz** (terzino,
+  Genoa) collassati su un player_id "Vaz M." gia' presente nel listino
+  come Marius Marin — scoperto perche' il `ruolo_fantalab` (D) non
+  coincideva col ruolo del player_id trovato (C), incongruenza notata
+  durante il debug, non dal codice.
+  Lezione generale: **un'iniziale scritta dalla fonte non e' rumore da
+  ripulire, e' disambiguazione intenzionale** — se la fonte la mette,
+  significa che sa che esiste un omonimo, e toglierla annulla proprio
+  l'informazione che serviva. Fix: il fallback fuzzy ora si attiva SOLO
+  se il nome FantaLab **non** porta gia' un'iniziale finale; se la
+  porta e il match esatto fallisce, va orfano invece che tentare
+  il fallback.
+- Conseguenza pratica: la sheet D e' stata cancellata e ricaricata
+  interamente (invece di correggere le 2 righe sbagliate a mano) dopo
+  il fix — piu' sicuro di un cherry-pick manuale su dati gia' sporchi.
+  `DELETE` a cascata su `player_tags` -> `fantalab_valutazioni` ->
+  `players` (solo orfani senza altri riferimenti), verificato via
+  conteggio righe cancellate prima di rilanciare.
+
+**Sanity check fatti:**
+- Percentuale di match totale (436/641 = 68.0%) combacia esattamente
+  con la ricognizione manuale del 31/07 — buon segno di non aver
+  introdotto regressioni sistemiche.
+- 203/206 orfani hanno `Fascia = 'Non Impostata'` (98.5%), coerente
+  con l'ipotesi "riserve/giovani non quotati" gia' verificata a mano
+  in precedenza. I 2 rimanenti (Terza/Quarta categoria) verosimilmente
+  legittimi.
+- Query di controllo sistemico introdotta: confronto tra
+  `players.ruolo` e `fantalab_valutazioni.ruolo_fantalab` per ogni riga
+  matchata — 0 discrepanze su tutte le 436 righe exact dopo il fix.
+  Questa query e' quella che avrebbe intercettato il bug El
+  Azzouzi/Vaz se fosse stata pensata PRIMA invece che durante il
+  debug — da rilanciare come check di routine ad ogni futuro carico
+  FantaLab, non solo quando qualcosa sembra gia' rotto.
+- **Nota**: dopo il fix, `fuzzy: 0` su tutte e 4 le sheet — il
+  fallback per-cognome (attivo solo quando FantaLab NON scrive
+  un'iniziale) non ha mai trovato un candidato unico. Possibile che
+  esistano match fuzzy legittimi persi per eccesso di prudenza — non
+  investigato oltre in questa sessione, il trade-off (nessun falso
+  positivo tipo Vaz/El Azzouzi) e' stato giudicato preferibile per ora.
+
+**Non ancora fatto (prossima sessione):**
+- Lo script `fantalab_matching.py` non e' idempotente sui player_id
+  orfani: un secondo carico della stessa sheet ricrea player_id
+  duplicati per gli stessi orfani invece di riconoscerli. Non bloccante
+  ora (si e' rilanciato solo sheet singole dopo cancellazione pulita),
+  ma va risolto prima di un futuro re-carico completo.
+- Investigare se il fallback fuzzy (fuzzy: 0 su tutto il carico) e'
+  davvero troppo conservativo o se e' corretto cosi'.
+- Dashboard HTML, README repo, fase 2 backtest (invariato dalle
+  sessioni precedenti).
