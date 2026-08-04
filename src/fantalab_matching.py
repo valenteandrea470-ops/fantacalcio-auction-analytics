@@ -9,11 +9,12 @@ sono gia' vicini al formato Fantagazzetta (cognome, o "Cognome I."),
 non nome-completo come Understat.
 
 Righe senza match diventano player_id "orfani" (match_method =
-'orphan_created') — vedi sql/004_fantalab_match_lineage.sql per il
-lineage, tenuto dentro fantalab_valutazioni stessa.
+'orphan_created'). Idempotente: un secondo carico (data diversa)
+riusa gli orfani gia' creati invece di duplicarli, riconoscendoli
+per (nome_pulito, ruolo_fantalab).
 
 Uso:
-    python src/fantalab_matching.py /path/to/VCAF_Ep__3.xlsx \
+    python3 src/fantalab_matching.py /path/to/VCAF_Ep__3.xlsx \
         --strategia "CarmySpecial" --data 2026-07-31
 """
 
@@ -67,7 +68,8 @@ def trova_corrispondenza_fantalab(nome_fantalab_raw, listino_df):
     # Fallback SOLO se FantaLab non ha gia' scritto un'iniziale disambiguante.
     # Se ce l'ha (es. "El Azzouzi A."), toglierla rischia di far collassare
     # due giocatori diversi sullo stesso player_id (bug trovato il 02/08 su
-    # El Azzouzi Bologna vs Frosinone) — meglio un orfano che un match sbagliato.
+    # El Azzouzi Bologna vs Frosinone, e Vaz Roma vs Genoa) — meglio un
+    # orfano che un match sbagliato.
     if _ha_iniziale(nome_pulito):
         return None, None, None
 
@@ -80,7 +82,28 @@ def trova_corrispondenza_fantalab(nome_fantalab_raw, listino_df):
 
     return None, None, None
 
-#-------------------------------------------------------------------
+
+# ------------------------------------------------------------------
+# Idempotenza orfani — riusa player_id gia' creati in carichi precedenti
+# ------------------------------------------------------------------
+def load_orfani_esistenti(conn):
+    """Mappa (nome_pulito, ruolo_fantalab) -> player_id per gli orfani gia'
+    creati in carichi precedenti, cosi' un nuovo scarico non li duplica."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT DISTINCT player_id, nome_raw, ruolo_fantalab "
+            "FROM fantalab_valutazioni WHERE match_method = 'orphan_created'"
+        )
+        righe = cur.fetchall()
+
+    orfani = {}
+    for player_id, nome_raw, ruolo in righe:
+        chiave = (rimuovi_accenti(nome_raw).replace("'", "").strip().lower(), ruolo)
+        orfani[chiave] = player_id
+    return orfani
+
+
+# ------------------------------------------------------------------
 # Parsing colonne FantaLab (Budget/PMA arrivano come stringhe sporche)
 # ------------------------------------------------------------------
 def _parse_pct(valore):
@@ -122,11 +145,11 @@ def _parse_num(valore):
 # ------------------------------------------------------------------
 # Caricamento di un singolo sheet
 # ------------------------------------------------------------------
-def process_sheet(conn, listino_df, path_xlsx, sheet_name, strategia, scaricato_il):
+def process_sheet(conn, listino_df, orfani_esistenti, path_xlsx, sheet_name, strategia, scaricato_il):
     ruolo = SHEET_TO_RUOLO[sheet_name]
     df = pd.read_excel(path_xlsx, sheet_name=sheet_name)
 
-    stats = {"exact": 0, "fuzzy": 0, "orphan_created": 0, "vuote_saltate": 0}
+    stats = {"exact": 0, "fuzzy": 0, "orphan_created": 0, "orphan_reused": 0, "vuote_saltate": 0}
 
     valutazioni_rows = []
     tag_rows = []
@@ -142,16 +165,27 @@ def process_sheet(conn, listino_df, path_xlsx, sheet_name, strategia, scaricato_
         if nome_matchato is not None:
             player_id = int(listino_df.loc[listino_df["nome_raw"] == nome_matchato, "player_id"].iloc[0])
         else:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "INSERT INTO players (nome_canonico, ruolo) VALUES (%s, %s) RETURNING player_id",
-                    (str(nome_raw_fantalab).strip(), ruolo),
-                )
-                player_id = cur.fetchone()[0]
+            nome_pulito_orfano = rimuovi_accenti(str(nome_raw_fantalab)).replace("'", "").strip().lower()
+            chiave_orfano = (nome_pulito_orfano, ruolo)
+
+            if chiave_orfano in orfani_esistenti:
+                player_id = orfani_esistenti[chiave_orfano]
+                stats["orphan_reused"] += 1
+            else:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "INSERT INTO players (nome_canonico, ruolo) VALUES (%s, %s) RETURNING player_id",
+                        (str(nome_raw_fantalab).strip(), ruolo),
+                    )
+                    player_id = cur.fetchone()[0]
+                orfani_esistenti[chiave_orfano] = player_id
+                stats["orphan_created"] += 1
+
             metodo = "orphan_created"
             confidenza = None
 
-        stats[metodo] += 1
+        if metodo in ("exact", "fuzzy"):
+            stats[metodo] += 1
 
         valutazioni_rows.append(
             {
@@ -220,8 +254,8 @@ def process_sheet(conn, listino_df, path_xlsx, sheet_name, strategia, scaricato_
     print(
         f"[{sheet_name}] {len(valutazioni_rows)} righe caricate — "
         f"exact: {stats['exact']}, fuzzy: {stats['fuzzy']}, "
-        f"orphan: {stats['orphan_created']}, vuote saltate: {stats['vuote_saltate']}, "
-        f"tag inseriti: {len(tag_rows)}"
+        f"orphan nuovi: {stats['orphan_created']}, orphan riusati: {stats['orphan_reused']}, "
+        f"vuote saltate: {stats['vuote_saltate']}, tag inseriti: {len(tag_rows)}"
     )
 
 
@@ -239,8 +273,9 @@ def main():
     conn = psycopg2.connect(**DB_CONFIG)
     try:
         listino_df = load_listino_df(conn, LISTINO_SEASON_LABEL)
+        orfani_esistenti = load_orfani_esistenti(conn)
         for sheet_name in args.sheets.split(","):
-            process_sheet(conn, listino_df, args.path_xlsx, sheet_name, args.strategia, args.data)
+            process_sheet(conn, listino_df, orfani_esistenti, args.path_xlsx, sheet_name, args.strategia, args.data)
     finally:
         conn.close()
 
@@ -249,4 +284,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
