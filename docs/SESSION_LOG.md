@@ -316,3 +316,49 @@ docs/DASHBOARD_REQUIREMENTS.md), invece di procedere alla cieca.
   precedente.
 - Dashboard HTML, README repo, fase 2 backtest (invariato dalle sessioni
   precedenti).
+
+---
+
+## 2026-08-02 (continua) — Idempotenza sugli orfani FantaLab
+
+**Fatto:**
+- `src/fantalab_matching.py`: aggiunta `load_orfani_esistenti()`, chiamata
+  una volta in `main()` prima di processare le sheet. Costruisce una mappa
+  `(nome_pulito, ruolo_fantalab) -> player_id` leggendo tutti gli orfani
+  gia' creati in carichi precedenti (qualsiasi strategia/data).
+- In `process_sheet`, la creazione di un player_id orfano ora controlla
+  prima questa mappa: se la chiave esiste gia', riusa il player_id invece
+  di inserirne uno nuovo. La mappa viene aggiornata anche a runtime
+  (visibile tra una sheet e l'altra nello stesso carico), non solo tra
+  carichi diversi.
+- Riepilogo di stampa aggiornato: distingue `orphan nuovi` da
+  `orphan riusati`.
+
+**Bug incontrato durante l'edit (non nel codice, in nano):**
+- Incollare un blocco di codice gia' indentato dentro `nano` fa scattare
+  l'auto-indent: nano somma l'indentazione della riga precedente a quella
+  incollata, che si accumula riga dopo riga finche' il file non ha piu'
+  un'indentazione coerente (`IndentationError: unindent does not match
+  any outer indentation level`). Non e' un errore di distrazione, e'
+  comportamento di default di nano su incolli multi-riga gia' indentati.
+  Fix per il futuro: per sostituire blocchi grossi di codice Python,
+  usare `cat > file << 'EOF' ... EOF` invece di `nano` — riscrive il file
+  intero senza toccare l'indentazione di quello che viene incollato.
+
+**Test fatto:**
+- Ricaricata la sola sheet P con data diversa (`2026-08-02`, di test,
+  non un vero scarico) sugli stessi 70 giocatori gia' presenti dal
+  31/07: risultato `orphan nuovi: 0, orphan riusati: 20` — i 20 orfani
+  di P riconosciuti correttamente, zero player_id duplicati creati.
+- Carico di test cancellato subito dopo (`DELETE FROM fantalab_valutazioni
+  WHERE scaricato_il = '2026-08-02'`) per non sporcare i dati reali del
+  31/07 — nessuna riga toccata in `player_tags` o `players` (i tag erano
+  identici, bloccati da `ON CONFLICT DO NOTHING`; i player_id erano tutti
+  riusati, nessuno nuovo da ripulire).
+
+**Non ancora fatto:**
+- Investigare se il fallback fuzzy (fuzzy: 0 su tutto il carico del
+  31/07) e' troppo conservativo o corretto cosi' — invariato dalla nota
+  precedente.
+- Dashboard HTML, README repo, fase 2 backtest (invariato dalle sessioni
+  precedenti).
