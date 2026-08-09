@@ -1,21 +1,25 @@
 """
 fantalab_matching.py — FUTDRAFT27
 
-Carica le valutazioni FantaLab (VCAF_Ep__3.xlsx, 4 sheet P/D/C/A) e le
-collega ai player_id gia' esistenti (creati da name_matching.py sul
-listino 25/26). Riusa rimuovi_accenti e load_listino_df da
-name_matching.py; il fallback fuzzy e' diverso perche' i nomi FantaLab
-sono gia' vicini al formato Fantagazzetta (cognome, o "Cognome I."),
-non nome-completo come Understat.
+Carica le valutazioni FantaLab (sheet P/D/C/A) e le collega ai player_id
+gia' esistenti (creati da name_matching.py sul listino 25/26). Riusa
+rimuovi_accenti e load_listino_df da name_matching.py; il fallback fuzzy
+e' diverso perche' i nomi FantaLab sono gia' vicini al formato
+Fantagazzetta (cognome, o "Cognome I."), non nome-completo come Understat.
 
 Righe senza match diventano player_id "orfani" (match_method =
-'orphan_created'). Idempotente: un secondo carico (data diversa)
-riusa gli orfani gia' creati invece di duplicarli, riconoscendoli
-per (nome_pulito, ruolo_fantalab).
+'orphan_created'). Idempotente: un secondo carico (data o strategia
+diversa) riusa gli orfani gia' creati invece di duplicarli,
+riconoscendoli per (nome_pulito, ruolo_fantalab) — condiviso tra
+tutte le strategie, cosi' un giocatore orfano per CarmySpecial non
+viene ricreato quando lo carica anche IlProfeta.
+
+Alcune fonti FantaLab non hanno la colonna 'Budget' (solo 'PMA') —
+gestito con .get(), diventa NULL senza errori.
 
 Uso:
-    python3 src/fantalab_matching.py /path/to/VCAF_Ep__3.xlsx \
-        --strategia "CarmySpecial" --data 2026-07-31
+    python3 src/fantalab_matching.py /path/to/file.xlsx \
+        --strategia "NomeStrategia" --data 2026-07-31
 """
 
 import os
@@ -67,9 +71,7 @@ def trova_corrispondenza_fantalab(nome_fantalab_raw, listino_df):
 
     # Fallback SOLO se FantaLab non ha gia' scritto un'iniziale disambiguante.
     # Se ce l'ha (es. "El Azzouzi A."), toglierla rischia di far collassare
-    # due giocatori diversi sullo stesso player_id (bug trovato il 02/08 su
-    # El Azzouzi Bologna vs Frosinone, e Vaz Roma vs Genoa) — meglio un
-    # orfano che un match sbagliato.
+    # due giocatori diversi sullo stesso player_id — vedi SESSION_LOG 02/08.
     if _ha_iniziale(nome_pulito):
         return None, None, None
 
@@ -88,7 +90,8 @@ def trova_corrispondenza_fantalab(nome_fantalab_raw, listino_df):
 # ------------------------------------------------------------------
 def load_orfani_esistenti(conn):
     """Mappa (nome_pulito, ruolo_fantalab) -> player_id per gli orfani gia'
-    creati in carichi precedenti, cosi' un nuovo scarico non li duplica."""
+    creati in carichi precedenti (qualsiasi strategia/data), cosi' un
+    nuovo scarico non li duplica."""
     with conn.cursor() as cur:
         cur.execute(
             "SELECT DISTINCT player_id, nome_raw, ruolo_fantalab "
@@ -104,7 +107,9 @@ def load_orfani_esistenti(conn):
 
 
 # ------------------------------------------------------------------
-# Parsing colonne FantaLab (Budget/PMA arrivano come stringhe sporche)
+# Parsing colonne FantaLab (Budget/PMA arrivano come stringhe sporche;
+# Fascia arriva con maiuscole incoerenti tra fonti diverse — es. "Top"
+# su un export, "top" su un altro, stesso significato)
 # ------------------------------------------------------------------
 def _parse_pct(valore):
     if pd.isna(valore):
@@ -140,6 +145,16 @@ def _parse_num(valore):
         return float(valore)
     except (ValueError, TypeError):
         return None
+
+
+def _parse_fascia(valore):
+    """Normalizza maiuscole incoerenti tra fonti ('top' / 'Top' -> 'Top')."""
+    if pd.isna(valore):
+        return None
+    testo = str(valore).strip()
+    if not testo:
+        return None
+    return testo.title()
 
 
 # ------------------------------------------------------------------
@@ -197,7 +212,7 @@ def process_sheet(conn, listino_df, orfani_esistenti, path_xlsx, sheet_name, str
                 "ruolo_fantalab": ruolo,
                 "squadra_fantalab": riga.get("Team"),
                 "obiettivo": _parse_bool_si_no(riga.get("Obiett.")),
-                "fascia": riga.get("Fascia"),
+                "fascia": _parse_fascia(riga.get("Fascia")),
                 "prezzo": _parse_num(riga.get("Prezzo")),
                 "budget_pct": _parse_pct(riga.get("Budget")),
                 "pma_pct": _parse_pct(riga.get("PMA")),
