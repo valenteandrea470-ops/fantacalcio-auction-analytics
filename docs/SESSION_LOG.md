@@ -412,3 +412,51 @@ pesi arbitrari da calibrare).
 
 **Non ancora fatto (invariato):**
 - Dashboard HTML, README repo (invariato dalle sessioni precedenti).
+
+---
+
+## 2026-08-09 — Secondo e terzo fantallenatore: Classicfantavirus, profeta
+
+**Fatto:**
+- `src/fantalab_matching.py`: aggiunta `_parse_fascia()` — normalizza
+  maiuscole incoerenti tra fonti (`'top'` su un export, `'Top'` su un
+  altro, stesso significato) con `.title()`. Nessun'altra modifica al
+  codice.
+- Caricati `Classicfantavirus.xlsx` (strategia `Classicfantavirus`) e
+  `profeta.xlsx` (strategia `profeta`), entrambi `scaricato_il =
+  '2026-08-09'`. Entrambi mancano della colonna `Budget` (solo `PMA`
+  presente) — gestito da `.get()`, `budget_pct` risulta NULL per
+  queste due fonti senza errori.
+
+**Verifica numerica:**
+- Classicfantavirus: 497 righe (60+176+174+87), 383 exact, 114 orfani.
+- profeta: 497 righe, 383 exact, 114 orfani — **identici** a
+  Classicfantavirus su tutti e tre i numeri. Conferma che i due
+  fantallenatori valutano lo stesso identico pool di giocatori (stesso
+  universo Serie A), solo con giudizi diversi (prezzo, fascia, tag) —
+  presupposto necessario per il confronto comparativo pianificato.
+- `orphan nuovi: 0` su tutte le sheet del secondo carico (profeta) —
+  idempotenza cross-strategia confermata: gli orfani creati da
+  Classicfantavirus sono stati riconosciuti e riusati, non duplicati.
+- CarmySpecial resta a parte con 641 righe (pool piu' ampio,
+  probabilmente include piu' Serie C/giovani) — differenza di
+  dimensione del dataset gia' notata prima del caricamento, non
+  un'anomalia.
+- Falso allarme durante la verifica: lettura errata di uno screenshot
+  del terminale (sheet A di Classicfantavirus, sembrava mancassero 4
+  righe nel conteggio) — risolto con query diretta al DB invece di
+  fidarsi del testo del terminale, tutto quadrava. Nota per il futuro:
+  in caso di dubbio aritmetico, sempre verificare via query, non a
+  occhio sullo screenshot.
+
+**Non ancora fatto:**
+- Analisi comparativa tra le tre strategie (CarmySpecial,
+  Classicfantavirus, profeta) — prossimo step esplicito richiesto da
+  Andrea, non ancora iniziato.
+- Investigare la differenza di pool tra CarmySpecial (641 righe) e gli
+  altri due (497 righe ciascuno) — probabile solo dimensione export
+  diversa, non verificato a fondo.
+- Ambiguita' Understat nomi-arte (Arthur), Pessina non agganciato,
+  modello leghe estere per giocatori tipo Akor Adam — invariati dalla
+  sessione precedente.
+- Dashboard HTML, README repo (invariato dalle sessioni precedenti).
