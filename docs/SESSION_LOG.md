@@ -362,3 +362,53 @@ docs/DASHBOARD_REQUIREMENTS.md), invece di procedere alla cieca.
   precedente.
 - Dashboard HTML, README repo, fase 2 backtest (invariato dalle sessioni
   precedenti).
+
+---
+
+## 2026-08-06 — Verifica fallback fuzzy: fuzzy=0 confermato corretto
+
+**Investigato:** se `fuzzy: 0` su tutto il carico FantaLab del 31/07 fosse
+un fallback troppo prudente che perde match legittimi.
+
+**Metodo:** confronto dei 205 orfani (senza iniziale, quelli che tentano
+il fallback per-cognome) contro tutti i nomi in `understat_player_season`
+su tutte le 5 stagioni — se un orfano non esiste nemmeno li', e' quasi
+certamente un giocatore mai passato per la Serie A prima, non un errore
+di matching.
+
+**Risultato:** 125/205 assenti da tutte le 5 stagioni Understat —
+candidati genuini a "mai in Serie A" (es. Akor Adam, arrivi dall'estero).
+Gli altri 80, apparsi come "cognome presente in Understat" nello script
+diagnostico, erano quasi tutti falsi positivi dello script stesso (bug:
+prendeva la prima parola del nome pulito come cognome, sbagliato per
+`nome+cognome` tipo "Arthur Melo" invece di "Cognome I."). Verificati a
+campione (Arthur Melo, Pessina): nessuno dei due e' nel listino 25_26,
+quindi il fallback fuzzy non ha perso nessun match reale — erano
+correttamente orfani.
+
+**Conclusione:** fuzzy=0 confermato corretto, non e' un difetto del
+fallback. Chiuso il dubbio aperto in sessione precedente.
+
+**Scoperte collaterali (fuori scope, solo segnate):**
+- Understat ha ambiguita' sui nomi-arte brasiliani/stile-singolo (es.
+  "Arthur" da solo compare per almeno 2-3 giocatori diversi: Arthur
+  Melo, Arthur Cabral, Arthur Theate — solo "Arthur Atta" ha un
+  player_id assegnato). MAPPATURA_MANUALE di `name_matching.py` non
+  copre questi casi. Da investigare in una sessione dedicata al
+  matching Understat, non FantaLab.
+- Massimo/Matteo Pessina: presente in Understat su tutte e 5 le
+  stagioni (21_22 -> 25_26), mai agganciato a nessun player_id, non
+  presente nel listino 25_26. Causa non ancora capita (prestito?
+  categoria inferiore? bug nel matching originale?) — da verificare.
+
+**Prossimo passo proposto da Andrea:** costruire un modello di
+valutazione per giocatori provenienti da leghe estere (es. Akor Adam,
+Bundesliga) con pesi per lega proporzionati alla Serie A — estensione
+naturale del modello xFMV gia' pensato per "QUOT. debole o assente".
+Non ancora iniziato: serve prima capire (1) quante leghe coprire, (2)
+se Understat copre quelle leghe con formato compatibile, (3) come si
+inserisce nella fase di regressione per-ruolo gia' pianificata (stessi
+pesi arbitrari da calibrare).
+
+**Non ancora fatto (invariato):**
+- Dashboard HTML, README repo (invariato dalle sessioni precedenti).
