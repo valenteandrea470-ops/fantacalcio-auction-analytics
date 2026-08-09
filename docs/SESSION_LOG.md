@@ -460,3 +460,33 @@ pesi arbitrari da calibrare).
   modello leghe estere per giocatori tipo Akor Adam — invariati dalla
   sessione precedente.
 - Dashboard HTML, README repo (invariato dalle sessioni precedenti).
+
+---
+
+## 2026-08-09 (continua) — Verifica differenza pool tra le tre fonti FantaLab
+
+**Investigato:** perche' CarmySpecial (641 righe) e Classicfantavirus/
+profeta (497 righe ciascuno) hanno numeri diversi — se fosse solo
+dimensione export (CarmySpecial superset) o rose realmente diverse.
+
+**Risultato:** NON e' un superset. 73 giocatori sono presenti in
+Classicfantavirus/profeta ma assenti da CarmySpecial (verificato anche
+il senso inverso di striscia). Ipotesi testata e scartata: non e' un
+problema di ruolo_fantalab diverso tra fonti che spezza il
+riconoscimento orfani (query su nome_raw esatto con ruolo diverso: 0
+righe). I tre fantallenatori tracciano semplicemente rose diverse per
+scelta personale — non esiste un "listino FantaLab unico" dietro,
+ogni fantallenatore segue/traccia la propria selezione di giocatori
+(profondita' diversa su Serie C/giovani di prospettiva).
+
+**Nota metodologica per prossima analisi comparativa:** confronti
+aggregati (prezzo medio, fascia media) tra le tre fonti vanno fatti
+SOLO sull'intersezione dei player_id tracciati da tutte e tre,
+altrimenti chi segue piu' giovani a basso prezzo risulta
+artificialmente "piu' economico" per composizione del campione, non
+per giudizio reale sui giocatori in comune.
+
+**Non ancora fatto:**
+- Analisi comparativa tra le tre strategie (con la nota sopra
+  applicata) — prossimo step.
+- Resto invariato dalla sessione precedente.
