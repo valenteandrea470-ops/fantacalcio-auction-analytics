@@ -490,3 +490,65 @@ per giudizio reale sui giocatori in comune.
 - Analisi comparativa tra le tre strategie (con la nota sopra
   applicata) — prossimo step.
 - Resto invariato dalla sessione precedente.
+
+---
+
+## 2026-08-09 (continua 2) — Prima vista di confronto tra fantallenatori
+
+**Fatto:**
+- `sql/005_fantalab_confronto_views.sql`: due viste.
+  - `v_fantalab_ultimo_snapshot`: prende sempre l'ultimo `scaricato_il`
+    per ciascuna strategia — un ricarico futuro con data piu' recente
+    sostituisce automaticamente quello vecchio nel confronto, senza
+    bisogno di toccare la query.
+  - `v_fantalab_confronto`: una riga per giocatore, SOLO
+    sull'intersezione delle fonti attive (tutte le strategie presenti
+    devono tracciare quel giocatore — vedi nota metodologica gia'
+    scritta in sessione precedente). Calcola prezzo_min/max/delta,
+    stddev, media, conteggio obiettivo, e due colonne jsonb
+    (prezzi_per_fonte, fasce_per_fonte) che si espandono da sole
+    quando si aggiunge una nuova strategia — nessuna colonna fissa
+    per fantallenatore, design pensato esplicitamente per il quarto
+    fantallenatore che Andrea integrera' quando la sua strategia
+    sara' pubblicata.
+
+**Decisione chiave — Prezzo = 0 trattato come "non ancora valutato":**
+- Scoperto (sanity check sui primi risultati: tutti i big-name con
+  CarmySpecial a 0.00) che CarmySpecial ha un placeholder 0 su gran
+  parte dei giocatori non ancora prezzati — confermato da Andrea:
+  compilazione in corso, si completera' solo a mercato chiuso
+  (1-3/09), non un giudizio di valore reale.
+- Fix: `NULLIF(prezzo, 0)` in tutte le aggregazioni (MIN/MAX/AVG/
+  STDDEV) — un prezzo 0 viene escluso dal calcolo invece di essere
+  trattato come valutazione vera, altrimenti ogni big-name non ancora
+  prezzato da una fonte avrebbe dominato la classifica dei disaccordi
+  con rumore, non segnale.
+- Aggiunta colonna `n_prezzi_validi` per trasparenza: un delta
+  calcolato su 2 fonti reali (su 3 presenti) e' meno solido di uno
+  calcolato su 3/3 — visibile a chi legge la vista, non nascosto.
+
+**Incidente minore:** `CREATE OR REPLACE VIEW` fallisce se si prova a
+inserire una colonna in mezzo (Postgres permette solo append in fondo)
+— serve DROP + CREATE esplicito in quel caso. Corretto al volo.
+
+**Stato attuale (parziale, atteso):** la classifica dei delta_prezzo
+piu' alti oggi riflette quasi solo "profeta vs Classicfantavirus"
+(CarmySpecial ancora in gran parte a placeholder 0) — cambiera'
+sostanzialmente quando CarmySpecial verra' ricaricato aggiornato.
+Deciso di procedere comunque: la logica della vista e' corretta e
+gia' pronta a recepire dati aggiornati senza modifiche, solo i dati
+sottostanti sono provvisori.
+
+**Non ancora fatto (prossima, in ordine):**
+1. Indice di aggressivita' per fantallenatore (prezzo medio vs QUOT.
+   per ruolo) — secondo pezzo del report comparativo, non ancora
+   iniziato.
+2. Problema aperto discusso con Andrea: come recuperare dati/statistiche
+   per gli orfani che sono NUOVI arrivi in Serie A quest'anno (es.
+   Akor Adam da Bundesliga) — spesso coincidono con "giocatori mai
+   visti in 5 stagioni Understat" gia' isolati nella sessione del
+   06/08 (125 dei 205 orfani di CarmySpecial). Necessita di dati da
+   altre leghe estere e un modello di pesatura — collegato alla nota
+   gia' presente su xFMV/leghe estere.
+3. Dashboard HTML, README, fase 2 backtest, ambiguita' Understat
+   nomi-arte, Pessina — invariati.
