@@ -85,15 +85,6 @@ regressione (insieme ai pesi 30/70 e 50/50):**
 - Pipeline end-to-end confermata: 1573 righe storico matchate, 591
   giocatori nel report finale, 105 con dato stimato via shrinkage
 
-**Incidente:** reset della VM (riavvio, non snapshot — nessun dato
-perso, confermato da `git log` e conteggio righe DB intatti dopo il
-riavvio) durante il passaggio di un comando `ALTER TABLE`. Causa
-probabile: incolla multi-riga nel terminale che ha inserito un
-carattere di controllo (`^[[200~`) rompendo il comando. Lezione:
-per comandi/file lunghi da incollare in VM, preferire scriverli prima
-in un file con `nano` ed eseguirli da lì (`psql -f file.sql`) invece
-di incollare blocchi lunghi direttamente su riga di comando.
-
 **Bug trovato e corretto in `features.py`:**
 - `salva_snapshot`: errore di indicizzazione (`colonne[1:]` invece di
   `colonne`) causava mismatch tra colonne dichiarate nell'INSERT e
