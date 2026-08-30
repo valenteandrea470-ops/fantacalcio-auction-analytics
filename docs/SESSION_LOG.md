@@ -543,3 +543,74 @@ sottostanti sono provvisori.
    gia' presente su xFMV/leghe estere.
 3. Dashboard HTML, README, fase 2 backtest, ambiguita' Understat
    nomi-arte, Pessina — invariati.
+
+---
+
+## 2026-08-28 — Supporto multi-lega per Understat, orfani classificati
+
+**Fatto:**
+- `player_provenienza` (migrazione 006): classificazione manuale dei
+  205 orfani FantaLab in 4 categorie (Giovanile/Primavera 93,
+  Trasferimento estero 64, Serie B/C italiana 41, Altro/Non so 7),
+  con lega di provenienza normalizzata (club/paese -> lega) dove
+  applicabile, e presenze/gol/assist da fonte esterna dove disponibili.
+  Compilazione manuale, non riproducibile automaticamente — file
+  sorgente versionato in `data/orfani_classificati_20260828.xlsx`.
+- `seasons` esteso con colonna `lega` (default 'Serie A' per le righe
+  esistenti, nessun dato toccato) — permette di agganciare stagioni
+  di leghe estere a `understat_player_season` senza modificarne lo
+  schema (migrazione 007).
+- Confermato via `understatapi` (libreria pip, wrapper degli endpoint
+  JSON di Understat) che le 4 leghe piu' rappresentate tra i
+  trasferimenti esteri (La Liga 12, Premier League 5, Bundesliga 4,
+  Ligue 1 4 — su 46 con lega nota) sono tutte coperte nativamente da
+  Understat, stesso schema dati gia' in uso per la Serie A.
+
+**Lezioni sul matching Understat <-> orfani esteri:**
+- Il matching automatico per cognome (riuso di `trova_corrispondenza`
+  stile Understat<->listino) non regge sui trasferimenti esteri: i
+  `nome_canonico` degli orfani FantaLab hanno formati misti (Cognome,
+  Cognome+Iniziale, Cognome-composto+Iniziale, e in alcuni casi
+  Nome+Cognome completo) che un'unica euristica non gestisce senza
+  falsi positivi — in particolare su cognomi comuni (es. "Gomez": 5
+  giocatori diversi in una sola lega) il rischio di agganciare il
+  player_id sbagliato e' concreto e silenzioso.
+- Approccio adottato: `find_candidati_understat.py` mostra i
+  candidati plausibili per ogni giocatore ancora senza match (ricerca
+  larga per sottostringa di cognome), la conferma finale resta umana.
+  Piu' lento ma zero rischio di corruzione silenziosa del dato — dato
+  il volume piccolo (10-15 giocatori per lega), il costo e'
+  accettabile.
+- **Attenzione stagione**: i trasferimenti verso la Serie A per la
+  26/27 vanno cercati nella stagione Understat 25/26
+  (`season='2025'`), quella appena conclusa — non 24/25. Le prime
+  verifiche fatte sulla stagione sbagliata vanno rifatte da capo,
+  nessun dato del genere e' stato consolidato.
+- Alcuni club appartenenti a `lega_provenienza_norm='La Liga'` nella
+  classificazione manuale giocavano in realta' in Segunda Division
+  nella stagione di riferimento (es. club promossi solo per la
+  stagione successiva) — la normalizzazione lega fatta su base
+  "squadra attuale" non basta, va verificata la divisione nella
+  stagione specifica.
+
+**Non ancora fatto:**
+- Ricaricare i trasferimenti esteri con la stagione corretta (25/26)
+  per tutte e 4 le leghe principali, con il flusso a conferma umana.
+- Estendere la classificazione (Serie B/C italiana, Giovanile/
+  Primavera) — nessuna fonte dati individuata finora per queste due
+  categorie.
+- Indice di aggressivita' per fantallenatore (prezzo medio vs QUOT.
+  per ruolo) — secondo pezzo del report comparativo, ancora non
+  iniziato.
+- Dashboard pubblica, README, fase 2 backtest — invariati.
+
+**Idee aperte per prossimi capitoli (non ancora iniziate):**
+- Dashboard ispirata nello stile a un progetto di riferimento esterno
+  (fishertiger, github.com/Zannael/fishertiger) ma costruita sui dati
+  propri del progetto — copiare il tipo di visualizzazione, non la
+  struttura dati.
+- Sistema di suggerimento coppie d'attacco basato sul calendario di
+  campionato (facilita' incroci in base al calendario stagionale).
+- Report FantaLab per squadra (formato diverso dalle valutazioni per
+  giocatore gia' integrate) e aggiornamento delle tre strategie
+  fantallenatore atteso per il 1 settembre, a mercato chiuso.
