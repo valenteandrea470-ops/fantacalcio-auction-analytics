@@ -614,3 +614,76 @@ sottostanti sono provvisori.
 - Report FantaLab per squadra (formato diverso dalle valutazioni per
   giocatore gia' integrate) e aggiornamento delle tre strategie
   fantallenatore atteso per il 1 settembre, a mercato chiuso.
+
+## 2026-09-01 — Mercato chiuso: caricamento listino 26/27 e strategie FantaLab aggiornate
+
+**Contesto:** calciomercato chiuso oggi. Nessun listino ufficiale
+Fantagazzetta/Fantacalcio.it disponibile per il 26/27 (verificato:
+`Statistiche_Fantacalcio_Stagione_2026_27.xlsx` e' un file di
+statistiche di rendimento, non di quotazioni — tutti i valori a 0,
+coerente con stagione non ancora iniziata. Nessun file "Quotazioni"
+disponibile).
+
+**Decisione chiave — QUOT. 26/27 come consenso, non da fonte ufficiale:**
+in assenza di listino ufficiale, la QUOT. per il 26/27 viene costruita
+come mediana del campo **`prezzo`** (non `quo`) tra le 4 strategie
+FantaLab (CarmySpecial, Classicfantavirus, profeta, NicolaGraziano —
+quest'ultimo nuovo fantallenatore, aggiunto oggi).
+
+**Scoperta durante il sanity check (importante, cambia la formula):**
+il campo `quo` di FantaLab e' identico su tutte e 4 le fonti per lo
+stesso giocatore (verificato su Malen: 36.00 ovunque; su Scamacca:
+19.00 ovunque) — quasi certamente e' la quotazione base ufficiale
+copiata da ciascun fantallenatore da fonte comune, NON un giudizio
+indipendente. Il vero segnale di disaccordo tra fantallenatori sta
+su `prezzo` (prezzo suggerito, soggettivo): su Scamacca varia da 37 a
+70 tra le 4 fonti. Se avessimo costruito il consenso su `quo` come
+pianificato ieri, il range min-max sarebbe stato quasi sempre zero —
+inutile come segnale. Corretto oggi prima di scrivere la vista.
+
+Range min-max mostrato in dashboard accanto al valore di consenso
+(su `prezzo`), per segnalare disaccordo reale tra fonti. Giocatori
+assenti da tutte e 4 le fonti: fallback a QUOT. 25/26 (`fantagazzetta_
+listino.quot`) con flag `dato_stimato`, coerente col pattern gia'
+usato in `player_metrics_snapshot`.
+Da implementare: vista `v_quotazioni_consenso_2627`.
+
+**Nota per dopo (non bloccante):** `fascia` ha inconsistenze di
+formato tra fonti oltre alle maiuscole gia' note (`Semi-Top` vs
+`Semitop` — trattino, non risolto da `.title()`). Da normalizzare
+se si vuole raggruppare/filtrare per fascia in dashboard — rimandato
+alla fase tag (punto 6 backlog).
+
+**Fatto:**
+- Season `26_27` inserita in `seasons` (season_id=9; salto di sequence
+  da 7 a 9 per un INSERT precedente fallito a meta' — nessun impatto,
+  i SERIAL non richiedono contiguita')
+- Caricate 4 strategie FantaLab con `fantalab_matching.py` (invariato,
+  nessuna modifica necessaria — legge colonne per nome, non posizione),
+  `scaricato_il = 2026-09-01`, 526 righe ciascuna, 373 exact ciascuna
+  (coerente, stesso listino 25/26 di riferimento per il matching):
+  - NicolaGraziano (nuovo fantallenatore): 47 orfani nuovi, 106 riusati
+  - CarmySpecial, Classicfantavirus, profeta: 0 orfani nuovi (tutti
+    riusati dagli orfani gia' creati da NicolaGraziano — idempotenza
+    confermata funzionante)
+  - 1136 tag inseriti in `player_tags`
+- Sanity check su Malen e Scamacca: confermato pattern `quo` identico
+  / `prezzo` divergente descritto sopra
+
+**Deciso e rimandato (non ora):**
+- Integrazione campionati esteri (La Liga e altri) — troppo lavoro a
+  ridosso dell'asta con mercato appena chiuso, rimandato a gennaio con
+  mercato meno movimentato
+- Ricerca/classificazione nuovi orfani (dai 4 file di oggi) — priorita'
+  dichiarata per il portfolio, ma non bloccante per l'asta. Programmata
+  dopo il completamento della dashboard (asta entro 4 giorni da oggi)
+- Normalizzazione `fascia` (trattino/spazio incoerente tra fonti)
+
+**Non ancora fatto (prossima sessione, si parte da qui):**
+1. Vista `v_quotazioni_consenso_2627` su `prezzo` (mediana + min/max +
+   fallback 25/26 con flag dato_stimato)
+2. `export_data.py` → `data.js` per dashboard offline (HTML/JS statico,
+   nessuna dipendenza da server/internet — deciso ieri: niente fetch()
+   di JSON esterno, dati incorporati come script incluso)
+3. Dashboard: tabella + pannello dettaglio giocatore + tracker rosa
+   con prezzo editabile
