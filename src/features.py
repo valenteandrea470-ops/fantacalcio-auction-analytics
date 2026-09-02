@@ -37,8 +37,8 @@ DB_CONFIG = {
     "password": os.environ.get("DB_PASSWORD"),
 }
 
-TARGET_SEASON_LABEL = "25_26"   # stagione per cui calcoliamo lo snapshot (l'asta di riferimento)
-MODEL_VERSION = "v1_notebook_port"
+TARGET_SEASON_LABEL = "26_27"   # stagione per cui calcoliamo lo snapshot (l'asta di riferimento)
+MODEL_VERSION = "v1_2627_consenso"
 
 ORDINE_STAGIONI = ["21_22", "22_23", "23_24", "24_25", "25_26"]
 METRICHE = ["goals_90", "assists_90", "xg90", "xa90"]
@@ -82,6 +82,23 @@ def carica_contesto_listino(conn, season_label):
     """
     return pd.read_sql(query, conn, params=(season_label,))
 
+def carica_contesto_2627(conn):
+    """Contesto per la stagione 26/27: ruolo e QUOT. dalla vista di
+    consenso (nessun listino ufficiale disponibile, vedi SESSION_LOG
+    01/09). fm/mv/pgv non esistono ancora (stagione non giocata) —
+    NULL esplicito, non un dato mancante per errore. Conseguenza
+    attesa e accettata: indice_convenienza_pct sara' NaN per tutti,
+    perche' il calcolo richiede un fm reale che qui non c'e'."""
+    query = """
+        SELECT player_id, ruolo,
+               quot_consenso_2627 AS quot,
+               NULL::numeric AS fm,
+               NULL::numeric AS mv,
+               NULL::integer AS pgv
+        FROM v_quotazioni_consenso_2627
+        WHERE player_id IS NOT NULL
+    """
+    return pd.read_sql(query, conn)
 
 # ------------------------------------------------------------------
 # Step 2 — media pesata per recenza x minuti (solo stagioni sopra soglia)
@@ -280,7 +297,6 @@ def salva_snapshot(conn, report, target_season_id):
 # ------------------------------------------------------------------
 # Main
 # ------------------------------------------------------------------
-
 def main():
     conn = psycopg2.connect(**DB_CONFIG)
     try:
@@ -289,9 +305,11 @@ def main():
             target_season_id = cur.fetchone()[0]
 
         storico_attivi = carica_storico_attivi(conn)
-        contesto = carica_contesto_listino(conn, TARGET_SEASON_LABEL)
+        if TARGET_SEASON_LABEL == "26_27":
+            contesto = carica_contesto_2627(conn)
+        else:
+            contesto = carica_contesto_listino(conn, TARGET_SEASON_LABEL)
         ruoli = contesto[["player_id", "ruolo"]]
-
         print(f"Righe storico attivo (matchate): {len(storico_attivi)}")
         print(f"Giocatori con contesto listino {TARGET_SEASON_LABEL}: {len(contesto)}")
 
