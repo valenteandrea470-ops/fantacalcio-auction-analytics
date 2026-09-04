@@ -687,3 +687,42 @@ alla fase tag (punto 6 backlog).
    di JSON esterno, dati incorporati come script incluso)
 3. Dashboard: tabella + pannello dettaglio giocatore + tracker rosa
    con prezzo editabile
+## Sessione [DATA ODIERNA] — Pannello dettaglio: overlay + icone tag
+
+**Fatto:**
+- Pannello dettaglio giocatore riscritto da slide laterale (striscia stretta
+  a destra) a overlay centrato: `.pannello` ora `position: fixed`,
+  centrato con transform, width min(900px, 90vw), max-height 85vh con
+  scroll interno.
+- Aggiunto `#pannello-backdrop`: sfondo scurito semi-trasparente dietro
+  l'overlay, cliccabile per chiudere (stesso comportamento della X).
+- X di chiusura ingrandita e trasformata in bottone circolare (era testo
+  piccolo in un angolo).
+- Icone tag integrate: mappa `TAG_ICONS` in app.js (18 dei 20 tag hanno
+  icona), funzione `renderTagIcon()` con fallback a testo semplice per
+  i tag senza immagine corrispondente.
+- File icone copiati in `dashboard/assets/tags/` (18 PNG, nomi originali
+  con spazi/apostrofi preservati — es. "Affare Nascosto.png",
+  "Imbattibilita'.png").
+- Icone a tinta piena nera ricolorate via CSS (`filter: invert(1)
+  brightness(1.6)`, classe `.tag-icon--mono`) per leggibilità su sfondo
+  scuro: costante, titolarissimo, tanti gol, modificatore + eventuali
+  altre ricolorate manualmente dall'utente.
+- Icone ingrandite da 28px a 42px, coerenti con lo spazio maggiore
+  dell'overlay.
+
+**Decisioni chiave:**
+- Backdrop cliccabile invece di solo X, per UX più naturale su overlay
+  grande (comportamento standard modale).
+- Fallback a testo semplice per tag senza icona, non icona placeholder
+  generica — più onesto visivamente, coerente con lo stile "nessun dato
+  finto" già seguito altrove nel progetto.
+
+**Non ancora fatto:**
+- Tag "incostante": nessuna icona trovata/scaricata, resta testo semplice.
+- Tag "contratto in scadenza": nessuna icona per scelta di design (non
+  rilevante visivamente), resta testo semplice.
+- Roster filter fix (Statistiche_Fantacalcio_Stagione_2026_27.xlsx →
+  fantagazzetta_listino) ancora pendente da sessioni precedenti — non
+  toccato in questa sessione.
+- FantaBookkeep (Excel INDEX/SUMPRODUCT) ancora accantonato.

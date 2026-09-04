@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FUTDRAFT27 — Asta FantaGucci</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="topbar">
+    <h1>FUTDRAFT27</h1>
+  </header>
+  <div class="ricerca-centrale">
+    <input type="search" id="ricerca" placeholder="Cerca giocatore…" autocomplete="off">
+  </div>
+
+  <section id="top-liste" class="strip-top"></section>
+
+  <div class="filtri" id="filtri-ruolo">
+    <button data-ruolo="TUTTI" class="attivo">Tutti</button>
+    <button data-ruolo="P">Portieri</button>
+    <button data-ruolo="D">Difensori</button>
+    <button data-ruolo="C">Centrocampisti</button>
+    <button data-ruolo="A">Attaccanti</button>
+  </div>
+
+  <main class="layout">
+    <table id="tabella-giocatori">
+      <thead>
+        <tr>
+          <th data-key="nome_canonico">Nome</th>
+          <th data-key="ruolo">R</th>
+          <th data-key="quot_consenso_2627" class="num">QUOT.</th>
+          <th data-key="indice_affidabilita" class="num">Affid.</th>
+          <th data-key="goals_90" class="num">Gol/90</th>
+          <th data-key="assists_90" class="num">Ast/90</th>
+        </tr>
+      </thead>
+      <tbody id="corpo-tabella"></tbody>
+    </table>
+  <div id="pannello-backdrop" class="pannello-backdrop"></div>
+
+    <aside id="pannello" class="pannello" aria-hidden="true">
+      <button id="chiudi-pannello" class="chiudi">×</button>
+      <div id="pannello-contenuto"></div>
+    </aside>
+  </main>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
