@@ -45,6 +45,7 @@ def carica_affidabilita(conn):
     query = """
         SELECT player_id, n_stagioni_valide, minuti_totali,
                goals_90, assists_90, xg90, xa90,
+               goals_90_trend, xg90_trend,
                indice_affidabilita, dato_stimato AS metriche_stimate
         FROM player_metrics_snapshot
         WHERE model_version = %s
